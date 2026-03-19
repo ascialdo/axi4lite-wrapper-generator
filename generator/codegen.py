@@ -21,7 +21,14 @@ _TEMPLATE_DIR = Path(__file__).parent / 'templates'
 _RE_EXTRA_BLANK = re.compile(r'\n\n( {2,}\S)')
 
 
-def generate(ir: IR, output_dir: str | Path) -> dict[str, Path]:
+def _clean_md(text: str) -> str:
+    """Strip trailing whitespace and collapse runs of more than two blank lines."""
+    text = re.sub(r'[ \t]+\n', '\n', text)
+    text = re.sub(r'\n{3,}', '\n\n', text)
+    return text
+
+
+def generate(ir: IR, output_dir: str | Path, generate_docs: bool = True) -> dict[str, Path]:
     """
     Render all templates and write output files.
 
@@ -60,6 +67,13 @@ def generate(ir: IR, output_dir: str | Path) -> dict[str, Path]:
         return text
 
     outputs: dict[str, Path] = {}
+
+    # <entity>_regmap.md
+    if generate_docs:
+        tmpl = env.get_template('regmap.md.j2')
+        md_path = output_dir / f'{ir.entity_name}_regmap.md'
+        md_path.write_text(_clean_md(tmpl.render(ir=ir)), encoding='utf-8')
+        outputs['regmap'] = md_path
 
     # axi_lite_if.vhd
     tmpl = env.get_template('axi_lite_if.vhd.j2')

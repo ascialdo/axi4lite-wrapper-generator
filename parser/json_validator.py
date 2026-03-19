@@ -139,7 +139,10 @@ def _validate_registers(raw: dict,
             reg_name, fields_raw, port_map, register_width, errors
         )
 
-        registers.append(Register(name=reg_name, offset=offset, fields=fields))
+        description = reg_def.get('description', '')
+        if not isinstance(description, str):
+            description = str(description)
+        registers.append(Register(name=reg_name, offset=offset, fields=fields, description=description))
 
     # Sort by offset for deterministic output
     registers.sort(key=lambda r: r.offset)
@@ -230,12 +233,16 @@ def _validate_fields(reg_name: str,
             errors.append(f"{loc}: invalid readback '{readback_raw}', must be one of {sorted(_VALID_READBACK)}")
         readback = Readback(readback_raw)
 
+        field_desc = fdef.get('description', '')
+        if not isinstance(field_desc, str):
+            field_desc = str(field_desc)
         fields.append(Field(
             port_name=port_name,
             bit_high=bit_high,
             bit_low=bit_low,
             access=access,
             readback=readback,
+            description=field_desc,
         ))
 
     return fields, bit_used

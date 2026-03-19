@@ -148,6 +148,8 @@ def main() -> int:
     parser.add_argument('regmap', nargs='?', help='Register map JSON file (.json)')
     parser.add_argument('--output-dir', '-o', default=None,
                         help='Output directory (default: ./output in standalone, ./generated in integration)')
+    parser.add_argument('--no-docs', action='store_true',
+                        help='Skip register map Markdown generation')
     args = parser.parse_args()
 
     # Determine mode
@@ -220,11 +222,10 @@ def main() -> int:
     print_section("Stage 4 — Code Generation")
     try:
         from generator.codegen import generate
-        outputs = generate(ir, output_dir)
+        outputs = generate(ir, output_dir, generate_docs=not args.no_docs)
         for label, path in outputs.items():
             size = path.stat().st_size
-            print_ok(f"{'axi_lite_if.vhd' if label == 'axi_lite_if' else path.name:40s} "
-                     f"{dim(f'({size:,} bytes)')}")
+            print_ok(f"{path.name:40s} {dim(f'({size:,} bytes)')}")
     except Exception as e:
         print_err(f"Code generation failed: {e}")
         traceback.print_exc()

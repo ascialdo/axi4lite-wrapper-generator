@@ -6,6 +6,7 @@ A Python CLI tool that automatically generates VHDL boilerplate to expose custom
 
 - `axi_lite_if.vhd` — AXI4-Lite slave register interface with shadow registers
 - `<entity_name>_axi.vhd` — Top-level wrapper that instantiates both the AXI interface and the original DUT
+- `<entity_name>_regmap.md` — Markdown register map table (use `--no-docs` to skip)
 
 ---
 
@@ -63,8 +64,9 @@ axi-wrapper-gen rtl/my_entity.vhd my_entity_regmap.json --output-dir generated
   "registers": {
     "CONTROL": {
       "offset": "0x00",
+      "description": "Main control register.",
       "fields": [
-        { "port": "enable", "bits": [0, 0], "access": "RW" },
+        { "port": "enable", "bits": [0, 0], "access": "RW", "description": "Enables the output." },
         { "port": "mode",   "bits": [2, 1], "access": "RW" },
         { "port": "status", "bits": [3, 3], "access": "RO", "readback": "LIVE" }
       ]
@@ -75,6 +77,8 @@ axi-wrapper-gen rtl/my_entity.vhd my_entity_regmap.json --output-dir generated
 
 **Access types**: `RW` (read/write), `RO` (read-only), `WO` (write-only)
 **Readback modes**: `SHADOW` (last written value, default) or `LIVE` (current DUT output)
+
+The `description` field is optional on both registers and fields. When present, it is included in the generated `_regmap.md`.
 
 ---
 
@@ -102,7 +106,7 @@ axi-wrapper-gen rtl/my_entity.vhd my_entity_regmap.json --output-dir generated
 
 ## Dependencies
 
-- Python >= 3.10
+- Python >= 3.9
 - [`jinja2`](https://jinja.palletsprojects.com/) >= 3.0
 
 ```bash

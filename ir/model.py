@@ -59,6 +59,7 @@ class Field:
     bit_low: int            # LSB position within the register word
     access: AccessType
     readback: Readback = Readback.SHADOW
+    description: str = ""
 
     @property
     def width(self) -> int:
@@ -77,6 +78,7 @@ class Register:
     name: str               # e.g. "REG0"
     offset: int             # byte offset, e.g. 0x00
     fields: list[Field] = field(default_factory=list)
+    description: str = ""
 
     @property
     def offset_hex(self) -> str:
