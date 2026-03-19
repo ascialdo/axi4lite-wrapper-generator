@@ -2,16 +2,115 @@
 
 A Python CLI tool that automatically generates VHDL boilerplate to expose custom RTL entities over an AXI4-Lite bus. Given a VHDL entity and a JSON register map, it outputs two ready-to-use VHDL files.
 
-## Usage
-
-```bash
-python cli.py path/custom.vhd path/custom_regmap.json --output-dir path/output_folder
-```
-
 ## Output
 
 - `axi_lite_if.vhd` — AXI4-Lite slave register interface with shadow registers
 - `<entity_name>_axi.vhd` — Top-level wrapper that instantiates both the AXI interface and the original DUT
+
+---
+
+## Modes
+
+### Standalone Mode
+
+Download the repo and run directly — no installation required.
+
+```bash
+python cli.py path/to/entity.vhd path/to/regmap.json --output-dir path/to/output
+```
+
+### Integration Mode (CI/CD)
+
+Install the tool as a Python package, then call the `axi-wrapper-gen` command. Designed for automated pipelines where a repository containing an IP core triggers wrapper generation on every push.
+
+#### 1. Install
+
+```bash
+pip install git+https://github.com/ascialdo/axi4lite-wrapper-generator
+```
+
+#### 2. Add `axi_wrapper.json` to your IP core repository
+
+```json
+{
+  "rtl": "rtl/my_entity.vhd",
+  "regmap": "my_entity_regmap.json",
+  "output_dir": "generated"
+}
+```
+
+#### 3. Run
+
+```bash
+axi-wrapper-gen
+```
+
+When called with no positional arguments, the tool reads `axi_wrapper.json` from the current directory. The `--output-dir` flag can override the config value.
+
+You can also pass explicit paths (same as standalone):
+
+```bash
+axi-wrapper-gen rtl/my_entity.vhd my_entity_regmap.json --output-dir generated
+```
+
+#### Example GitHub Actions Workflow
+
+```yaml
+name: Generate AXI4-Lite Wrapper
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  generate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install wrapper generator
+        run: pip install git+https://github.com/ascialdo/axi4lite-wrapper-generator
+
+      - name: Generate wrapper
+        run: axi-wrapper-gen
+
+      - name: Commit generated files
+        run: |
+          git config user.name "github-actions"
+          git config user.email "github-actions@github.com"
+          git add generated/
+          git diff --cached --quiet || git commit -m "ci: update generated AXI4-Lite wrapper"
+          git push
+```
+
+---
+
+## Register Map JSON Format
+
+```json
+{
+  "register_width": 32,
+  "registers": {
+    "CONTROL": {
+      "offset": "0x00",
+      "fields": [
+        { "port": "enable", "bits": [0, 0], "access": "RW" },
+        { "port": "mode",   "bits": [2, 1], "access": "RW" },
+        { "port": "status", "bits": [3, 3], "access": "RO", "readback": "LIVE" }
+      ]
+    }
+  }
+}
+```
+
+**Access types**: `RW` (read/write), `RO` (read-only), `WO` (write-only)
+**Readback modes**: `SHADOW` (last written value, default) or `LIVE` (current DUT output)
+
+---
 
 ## Architecture: 4-Stage Pipeline
 
@@ -19,7 +118,7 @@ python cli.py path/custom.vhd path/custom_regmap.json --output-dir path/output_f
 VHDL file + JSON regmap
         │
         ▼
-[Stage 1A] vhdl_parser.py     → extracts entity name, ports, generics (regex-based)
+[Stage 1A] vhdl_parser.py      → extracts entity name, ports, generics (regex-based)
         │
         ▼
 [Stage 1B+2] json_validator.py → validates JSON schema, builds IR (all errors at once)
@@ -44,28 +143,9 @@ axi_lite_if.vhd  +  <entity>_axi.vhd
 | `parser/json_validator.py` | JSON schema validation + IR builder; collects all errors before raising |
 | `checks/semantic.py` | Warns on unmapped ports, direction/access mismatches |
 | `generator/codegen.py` | Jinja2 renderer with custom filters (`ljust`, `bin_addr`) |
-| `templates/*.j2` | Two Jinja2 VHDL templates for the AXI interface and the top wrapper |
+| `generator/templates/*.j2` | Two Jinja2 VHDL templates for the AXI interface and the top wrapper |
 
-## Register Map JSON Format
-
-```json
-{
-  "register_width": 32,
-  "registers": {
-    "CONTROL": {
-      "offset": "0x00",
-      "fields": [
-        { "port": "enable",    "bits": [0, 0], "access": "RW" },
-        { "port": "mode",      "bits": [2, 1], "access": "RW" },
-        { "port": "status",    "bits": [3, 3], "access": "RO", "readback": "LIVE" }
-      ]
-    }
-  }
-}
-```
-
-**Access types**: `RW` (read/write), `RO` (read-only), `WO` (write-only)
-**Readback modes**: `SHADOW` (last written value, default) or `LIVE` (current DUT output)
+---
 
 ## Key Design Choices
 
@@ -80,10 +160,12 @@ axi_lite_if.vhd  +  <entity>_axi.vhd
 - Registers always reset to 0 (no reset value specification in JSON)
 - No support for AXI handshake backpressure or multi-cycle operations
 
+---
+
 ## Dependencies
 
-- Python 3.x (stdlib)
-- [`jinja2`](https://jinja.palletsprojects.com/)
+- Python >= 3.10
+- [`jinja2`](https://jinja.palletsprojects.com/) >= 3.0
 
 ```bash
 pip install jinja2

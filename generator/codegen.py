@@ -12,7 +12,7 @@ from jinja2 import Environment, FileSystemLoader, StrictUndefined
 
 from ir.model import IR
 
-_TEMPLATE_DIR = Path(__file__).parent.parent / 'templates'
+_TEMPLATE_DIR = Path(__file__).parent / 'templates'
 
 # Collapse the extra blank line Jinja2 inserts between consecutive indented lines.
 # Matches: any blank line followed by an indented line (2+ leading spaces).
