@@ -12,6 +12,9 @@ dependencies = ["jinja2>=3.0"]
 [project.scripts]
 axi-wrapper-gen = "cli:main"
 
+[tool.setuptools]
+py-modules = ["cli"]
+
 [tool.setuptools.packages.find]
 where = ["."]
 include = ["checks", "generator", "ir", "parser"]
