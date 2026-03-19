@@ -53,40 +53,6 @@ You can also pass explicit paths (same as standalone):
 axi-wrapper-gen rtl/my_entity.vhd my_entity_regmap.json --output-dir generated
 ```
 
-#### Example GitHub Actions Workflow
-
-```yaml
-name: Generate AXI4-Lite Wrapper
-
-on:
-  push:
-    branches: [main]
-
-jobs:
-  generate:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.11"
-
-      - name: Install wrapper generator
-        run: pip install git+https://github.com/ascialdo/axi4lite-wrapper-generator
-
-      - name: Generate wrapper
-        run: axi-wrapper-gen
-
-      - name: Commit generated files
-        run: |
-          git config user.name "github-actions"
-          git config user.email "github-actions@github.com"
-          git add generated/
-          git diff --cached --quiet || git commit -m "ci: update generated AXI4-Lite wrapper"
-          git push
-```
-
 ---
 
 ## Register Map JSON Format
@@ -112,27 +78,6 @@ jobs:
 
 ---
 
-## Architecture: 4-Stage Pipeline
-
-```
-VHDL file + JSON regmap
-        │
-        ▼
-[Stage 1A] vhdl_parser.py      → extracts entity name, ports, generics (regex-based)
-        │
-        ▼
-[Stage 1B+2] json_validator.py → validates JSON schema, builds IR (all errors at once)
-        │
-        ▼
-[Stage 3] semantic.py          → cross-checks (warnings: direction mismatch, unmapped ports)
-        │
-        ▼
-[Stage 4] codegen.py           → Jinja2 renders two VHDL files
-        │
-        ▼
-axi_lite_if.vhd  +  <entity>_axi.vhd
-```
-
 ## Key Modules
 
 | File | Role |
@@ -146,13 +91,6 @@ axi_lite_if.vhd  +  <entity>_axi.vhd
 | `generator/templates/*.j2` | Two Jinja2 VHDL templates for the AXI interface and the top wrapper |
 
 ---
-
-## Key Design Choices
-
-- **Shadow registers**: RW/WO fields are buffered in shadow registers; RO fields sample the DUT output every cycle
-- **No external HDL tool**: Parsing is entirely regex-based — no Vivado, Quartus, or GHDL required
-- **Generic-dependent ports**: Detected and excluded from register mapping (width cannot be statically resolved)
-- **Error aggregation**: All validation errors collected and shown at once, not one at a time
 
 ## Limitations
 
