@@ -1,0 +1,38 @@
+{
+  "register_width": 32,
+  "registers": {
+    "REG_CTRL": {
+      "offset": "0x00",
+      "fields": [
+        { "port": "enable",     "bits": [0, 0], "access": "RW" },
+        { "port": "irq_mask",   "bits": [7, 4], "access": "RW" }
+      ]
+    },
+    "REG_DUTY": {
+      "offset": "0x04",
+      "fields": [
+        { "port": "duty_cycle", "bits": [7, 0], "access": "RW" }
+      ]
+    },
+    "REG_PRESCALER": {
+      "offset": "0x08",
+      "fields": [
+        { "port": "prescaler",  "bits": [15, 0], "access": "RW" }
+      ]
+    },
+    "REG_STATUS": {
+      "offset": "0x0C",
+      "fields": [
+        { "port": "pwm_out",     "bits": [0, 0], "access": "RO" },
+        { "port": "period_done", "bits": [1, 1], "access": "RO" },
+        { "port": "irq_status",  "bits": [7, 4], "access": "RO" }
+      ]
+    },
+    "REG_CYCLE_CNT": {
+      "offset": "0x10",
+      "fields": [
+        { "port": "cycle_count", "bits": [31, 0], "access": "RO" }
+      ]
+    }
+  }
+}
