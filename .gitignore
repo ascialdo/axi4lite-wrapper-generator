@@ -11,3 +11,7 @@ __pycache__/
 .venv/
 venv/
 env/
+
+# Generated output
+*_axi/
+output/
