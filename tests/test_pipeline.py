@@ -218,7 +218,7 @@ class TestJSONValidator(unittest.TestCase):
             json.dump(json_dict, f); json_name = f.name
         try:
             name, ports, generics = parse_entity(vhd_name)
-            return build_ir(vhd_name, json_name, name, ports, generics)
+            return build_ir(json_name, name, ports, generics)
         finally:
             os.unlink(vhd_name); os.unlink(json_name)
 
@@ -344,7 +344,7 @@ class TestSemanticChecker(unittest.TestCase):
             json.dump(json_dict, f); jsn = f.name
         try:
             n, p, g = parse_entity(vhd)
-            return build_ir(vhd, jsn, n, p, g)
+            return build_ir(jsn, n, p, g)
         finally:
             os.unlink(vhd); os.unlink(jsn)
 
@@ -405,7 +405,7 @@ class TestCodegen(unittest.TestCase):
         Path(vhd_path).write_text(_make_std_vhd())
         Path(jsn_path).write_text(json.dumps(_make_std_json()))
         n, p, g = parse_entity(vhd_path)
-        self.ir = build_ir(vhd_path, jsn_path, n, p, g)
+        self.ir = build_ir(jsn_path, n, p, g)
 
     def _generate(self):
         from generator.codegen import generate
@@ -445,10 +445,11 @@ class TestCodegen(unittest.TestCase):
         from parser.json_validator import build_ir
         import json, tempfile, os
         # Use the PWM fixture which has generics
-        vhd = '/home/claude/axi_wrapper/tests/pwm_controller.vhd'
-        jsn = '/home/claude/axi_wrapper/tests/pwm_regmap.json'
+        tests_dir = Path(__file__).parent
+        vhd = str(tests_dir / 'pwm_controller.vhd')
+        jsn = str(tests_dir / 'pwm_regmap.json')
         n, p, g = parse_entity(vhd)
-        ir = build_ir(vhd, jsn, n, p, g)
+        ir = build_ir(jsn, n, p, g)
         from generator.codegen import generate
         import tempfile
         out_dir = tempfile.mkdtemp()

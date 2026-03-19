@@ -1,28 +1,18 @@
 # AXI4-Lite Wrapper Generator
 
-A Python CLI tool that automatically generates VHDL boilerplate to expose custom RTL entities over an AXI4-Lite bus. Given a VHDL entity and a JSON register map, it outputs two ready-to-use VHDL files.
+A Python CLI tool that automatically generates VHDL boilerplate to expose custom RTL entities over an AXI4-Lite bus. Reads a single `axi_config.json` file and produces three output files.
 
 ## Output
 
+Generated into `<entity_name>_axi/` in the same directory as the VHD file:
+
 - `axi_lite_if.vhd` — AXI4-Lite slave register interface with shadow registers
 - `<entity_name>_axi.vhd` — Top-level wrapper that instantiates both the AXI interface and the original DUT
-- `<entity_name>_regmap.md` — Markdown register map table (use `--no-docs` to skip)
+- `<entity_name>_regmap.md` — Markdown register map table (skip with `--no-docs`)
 
 ---
 
-## Modes
-
-### Standalone Mode
-
-Download the repo and run directly — no installation required.
-
-```bash
-python cli.py path/to/entity.vhd path/to/regmap.json --output-dir path/to/output
-```
-
-### Integration Mode (CI/CD)
-
-Install the tool as a Python package, then call the `axi-wrapper-gen` command. Designed for automated pipelines where a repository containing an IP core triggers wrapper generation on every push.
+## Usage
 
 #### 1. Install
 
@@ -30,13 +20,23 @@ Install the tool as a Python package, then call the `axi-wrapper-gen` command. D
 pip install git+https://github.com/ascialdo/axi4lite-wrapper-generator
 ```
 
-#### 2. Add `axi_wrapper.json` to your IP core repository
+#### 2. Add `axi_config.json` to the root of your IP core repository
 
 ```json
 {
-  "rtl": "rtl/my_entity.vhd",
-  "regmap": "my_entity_regmap.json",
-  "output_dir": "generated"
+  "top_entity": "rtl/my_entity.vhd",
+  "register_width": 32,
+  "registers": {
+    "REG_CTRL": {
+      "offset": "0x00",
+      "description": "Main control register.",
+      "fields": [
+        { "port": "enable", "bits": [0, 0], "access": "RW", "description": "Enables the output." },
+        { "port": "mode",   "bits": [2, 1], "access": "RW" },
+        { "port": "status", "bits": [3, 3], "access": "RO", "readback": "live" }
+      ]
+    }
+  }
 }
 ```
 
@@ -46,39 +46,38 @@ pip install git+https://github.com/ascialdo/axi4lite-wrapper-generator
 axi-wrapper-gen
 ```
 
-When called with no positional arguments, the tool reads `axi_wrapper.json` from the current directory. The `--output-dir` flag can override the config value.
-
-You can also pass explicit paths (same as standalone):
-
-```bash
-axi-wrapper-gen rtl/my_entity.vhd my_entity_regmap.json --output-dir generated
-```
+The tool reads `axi_config.json` from the current directory. No other arguments are required.
 
 ---
 
-## Register Map JSON Format
+## axi_config.json Reference
 
-```json
-{
-  "register_width": 32,
-  "registers": {
-    "CONTROL": {
-      "offset": "0x00",
-      "description": "Main control register.",
-      "fields": [
-        { "port": "enable", "bits": [0, 0], "access": "RW", "description": "Enables the output." },
-        { "port": "mode",   "bits": [2, 1], "access": "RW" },
-        { "port": "status", "bits": [3, 3], "access": "RO", "readback": "LIVE" }
-      ]
-    }
-  }
-}
-```
+| Key | Required | Description |
+|-----|----------|-------------|
+| `top_entity` | yes | Path to the VHDL source file, relative to `axi_config.json` |
+| `register_width` | no | AXI data bus width: `32` (default) or `64` |
+| `registers` | yes | Register map object (see below) |
+
+**Register fields:**
+
+| Key | Required | Description |
+|-----|----------|-------------|
+| `offset` | yes | Byte offset as hex string, e.g. `"0x00"`. Must be 4-byte aligned. |
+| `description` | no | Description included in the generated `_regmap.md` |
+| `fields` | yes | List of field objects |
+
+**Field keys:**
+
+| Key | Required | Description |
+|-----|----------|-------------|
+| `port` | yes | Port name from the VHDL entity |
+| `bits` | yes | `[high, low]` bit positions within the register |
+| `access` | yes | `RW`, `RO`, or `WO` |
+| `readback` | no | `shadow` (default) or `live` |
+| `description` | no | Description included in the generated `_regmap.md` |
 
 **Access types**: `RW` (read/write), `RO` (read-only), `WO` (write-only)
-**Readback modes**: `SHADOW` (last written value, default) or `LIVE` (current DUT output)
-
-The `description` field is optional on both registers and fields. When present, it is included in the generated `_regmap.md`.
+**Readback modes**: `shadow` — reads return last written value; `live` — reads return current DUT output
 
 ---
 

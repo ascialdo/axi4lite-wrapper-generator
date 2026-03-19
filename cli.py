@@ -2,16 +2,28 @@
 """
 axi_wrapper — Automated AXI4-Lite wrapper generator for custom RTL.
 
-Standalone mode:
-    python cli.py <rtl.vhd> <register_map.json> [--output-dir <dir>]
-    axi-wrapper-gen <rtl.vhd> <register_map.json> [--output-dir <dir>]
+Usage:
+    axi-wrapper-gen [--no-docs]
 
-Integration mode (no positional args — reads axi_wrapper.json in current dir):
-    axi-wrapper-gen
+Requires axi_config.json in the current directory. Example:
 
-Outputs:
+    {
+      "top_entity": "rtl/my_entity.vhd",
+      "register_width": 32,
+      "registers": {
+        "REG_CTRL": {
+          "offset": "0x00",
+          "fields": [
+            { "port": "enable", "bits": [0, 0], "access": "RW" }
+          ]
+        }
+      }
+    }
+
+Outputs (written to <top_entity_dir>/<entity_name>_axi/):
     axi_lite_if.vhd       — AXI4-Lite slave register interface
     <entity>_axi.vhd      — Top wrapper connecting DUT to AXI interface
+    <entity>_regmap.md    — Register map documentation (skipped with --no-docs)
 """
 from __future__ import annotations
 
@@ -103,34 +115,37 @@ def print_register_table(ir):
     print(bot)
 
 
-# ── config loader (integration mode) ─────────────────────────────────────────
+# ── config loader ─────────────────────────────────────────────────────────────
 
-_CONFIG_FILE = 'axi_wrapper.json'
+_CONFIG_FILE = 'axi_config.json'
 
-def _load_integration_config() -> tuple[str, str, str]:
+def _load_config() -> tuple[str, Path]:
     """
-    Read axi_wrapper.json from the current directory.
-    Returns (rtl_path, regmap_path, output_dir).
+    Read axi_config.json from the current directory.
+    Returns (rtl_path, config_path).
     """
     cfg_path = Path(_CONFIG_FILE)
     if not cfg_path.exists():
-        print_err(f"Integration mode: '{_CONFIG_FILE}' not found in current directory.")
-        print_info("Create it with keys: rtl, regmap, output_dir")
-        print_info("Or pass positional args for standalone mode: axi-wrapper-gen <rtl.vhd> <regmap.json>")
+        print_err(f"'{_CONFIG_FILE}' not found in current directory.")
+        print_info("Create it with at minimum: top_entity, register_width, registers")
         sys.exit(1)
 
     try:
-        cfg = json.loads(cfg_path.read_text())
+        cfg = json.loads(cfg_path.read_text(encoding='utf-8'))
     except json.JSONDecodeError as e:
         print_err(f"Failed to parse '{_CONFIG_FILE}': {e}")
         sys.exit(1)
 
-    missing = [k for k in ('rtl', 'regmap') if k not in cfg]
-    if missing:
-        print_err(f"'{_CONFIG_FILE}' is missing required keys: {', '.join(missing)}")
+    if 'top_entity' not in cfg:
+        print_err(f"'{_CONFIG_FILE}' is missing required key: top_entity")
         sys.exit(1)
 
-    return cfg['rtl'], cfg['regmap'], cfg.get('output_dir', 'generated')
+    rtl_path = cfg['top_entity']
+    if not Path(rtl_path).exists():
+        print_err(f"top_entity file not found: '{rtl_path}'")
+        sys.exit(1)
+
+    return rtl_path, cfg_path
 
 
 # ── main pipeline ─────────────────────────────────────────────────────────────
@@ -139,36 +154,17 @@ def main() -> int:
     parser = argparse.ArgumentParser(
         description='Generate AXI4-Lite wrapper for a custom RTL entity.',
         formatter_class=argparse.RawDescriptionHelpFormatter,
-        epilog=(
-            'Integration mode: run with no positional args to read from '
-            f'{_CONFIG_FILE} in the current directory.'
-        ),
+        epilog=f'Reads {_CONFIG_FILE} from the current directory.',
     )
-    parser.add_argument('rtl',    nargs='?', help='VHDL source file (.vhd)')
-    parser.add_argument('regmap', nargs='?', help='Register map JSON file (.json)')
-    parser.add_argument('--output-dir', '-o', default=None,
-                        help='Output directory (default: ./output in standalone, ./generated in integration)')
     parser.add_argument('--no-docs', action='store_true',
                         help='Skip register map Markdown generation')
     args = parser.parse_args()
 
-    # Determine mode
-    if args.rtl and args.regmap:
-        rtl_path    = args.rtl
-        regmap_path = args.regmap
-        output_dir  = args.output_dir or 'output'
-        mode        = 'standalone'
-    elif not args.rtl and not args.regmap:
-        rtl_path, regmap_path, output_dir = _load_integration_config()
-        if args.output_dir:
-            output_dir = args.output_dir
-        mode = 'integration'
-    else:
-        print_err("Provide both <rtl> and <regmap>, or neither (integration mode).")
-        return 1
+    rtl_path, cfg_path = _load_config()
 
     print_banner()
-    print_info(f"Mode: {bold(mode)}")
+    print_info(f"Config: {bold(_CONFIG_FILE)}")
+    print_info(f"Entity file: {bold(rtl_path)}")
 
     # ── Stage 1A: VHDL parser ──────────────────────────────────────────────
     print_section("Stage 1A — VHDL Entity Parser")
@@ -187,11 +183,14 @@ def main() -> int:
         print_err(f"VHDL parse failed: {e}")
         return 1
 
+    # Output directory: <vhd_dir>/<entity_name>_axi/
+    output_dir = Path(rtl_path).parent / f"{entity_name}_axi"
+
     # ── Stage 1B + 2: JSON validator + IR builder ─────────────────────────
     print_section("Stage 1B + 2 — JSON Validator & IR Builder")
     try:
         from parser.json_validator import build_ir, ValidationError
-        ir = build_ir(rtl_path, regmap_path, entity_name, ports, generics)
+        ir = build_ir(cfg_path, entity_name, ports, generics)
         print_ok(f"Register map loaded: {len(ir.registers)} register(s)")
         print_ok(f"Data width: {ir.register_width} bits")
         print_ok(f"Address bits required: {ir.addr_bits}")
@@ -232,7 +231,7 @@ def main() -> int:
         return 1
 
     print()
-    print(green(bold(f"  Done — outputs written to '{output_dir}'/")))
+    print(green(bold(f"  Done — outputs written to '{output_dir}/'")) )
     print()
     return 0
 

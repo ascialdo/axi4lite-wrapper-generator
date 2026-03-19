@@ -43,13 +43,12 @@ _VALID_READBACK = {r.value for r in Readback}
 # Public API
 # ---------------------------------------------------------------------------
 
-def build_ir(vhdl_path: str | Path,
-             json_path:  str | Path,
+def build_ir(json_path: str | Path,
              entity_name: str,
              ports: list[Port],
              generics: list) -> IR:
     """
-    Load + validate the JSON register map, cross-check against parsed ports,
+    Load + validate axi_config.json, cross-check against parsed ports,
     and return a fully constructed IR.
 
     Raises ValidationError (with all errors collected) if anything is wrong.
